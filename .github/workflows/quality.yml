@@ -1,0 +1,82 @@
+name: quality-ci
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    name: sonar
+    # Only run Sonar on PRs originating in repo, except Dependabot PRs which
+    # do not have access to secrets https://github.com/dependabot/dependabot-core/issues/3253#issuecomment-852541544
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: use Node.js 16
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+
+      - name: install dependencies
+        run: npm install
+
+      - name: run build script
+        run: npm run coverage
+
+      - name: get current package version
+        id: get_version
+        run: echo ::set-output name=PACKAGE_VERSION::$(node -e "console.log(require('./package.json').version);")
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ steps.get_version.outputs.PACKAGE_VERSION }}
+
+  format:
+    runs-on: ubuntu-latest
+    name: format
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: use Node.js 16
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+
+      - name: install dependencies
+        run: npm install
+
+      - name: run formatting check
+        run: npm run format:check
+
+  lint:
+    runs-on: ubuntu-latest
+    name: lint
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: use Node.js 16
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+
+      - name: install dependencies
+        run: npm install
+
+      - name: run lint check
+        run: npm run lint
